@@ -22,7 +22,7 @@ function varargout = GUI(varargin)
 
 % Edit the above text to modify the response to help GUI
 
-% Last Modified by GUIDE v2.5 09-Oct-2018 15:58:38
+% Last Modified by GUIDE v2.5 11-Oct-2018 09:24:36
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -104,6 +104,153 @@ setappdata(0,'ref_pathname', pathname)
 
 set(handles.SelectedFileText, 'string', strcat(pathname,'/',filename))
 
+% Load and bin data
+filename = getappdata(0,'ref_filename')
+pathname = getappdata(0,'ref_pathname')
+[Imported_num, Imported_txt] = xlsread(strcat(pathname,'/',filename));
+figure(1);
+pcshow([Imported_num(:,2),Imported_num(:,3),Imported_num(:,4)],'MarkerSize',100);
+
+xlabel('X');
+ylabel('Y');
+zlabel('Z');
+% slice to 2D
+divisor = 3;
+width = max(abs(Imported_num(:,4))/divisor);
+
+
+% Drawdown Analysis
+if get(handles.Drawdown,'value') == 1
+    bin=[];
+    temp_bin=[];
+        for l = 1:divisor
+            top = width*l;
+            bottom = top - width;
+            limits(l,1)=bottom;
+            limits(l,2)=top;
+            m=0;
+            temp_bin=[];
+            for n = 1: size(Imported_num)
+                if Imported_num(n,3)>0
+                    if abs(Imported_num(n,4))>bottom
+                        if abs(Imported_num(n,4))<top
+                            m=m+1;
+                            temp_bin(m,:) = Imported_num(n,1:4);
+                            length(l) = m;
+                        end
+                    end
+                end
+            end   
+            size(temp_bin);
+            bin{l}=temp_bin;
+        end
+    setappdata(0,'bin', bin); 
+    axes(handles.SlicePlot)
+    plot(bin{floor(1)}(:,2),bin{floor(1)}(:,3),'o');
+    ylim([0 1])    
+end
+
+% Angle of Repose Analysis
+if get(handles.AOR,'value') == 1
+        bin=[];
+        temp_bin=[];
+        for l = 1:divisor
+            top = width*l;
+            bottom = top - width;
+            limits(l,1)=bottom;
+            limits(l,2)=top;
+            m=0;
+            temp_bin=[];
+            for n = 1: size(Imported_num)
+                if Imported_num(n,3)<0
+                    if abs(Imported_num(n,4))>bottom
+                        if abs(Imported_num(n,4))<top
+                            m=m+1;
+                            temp_bin(m,:) = Imported_num(n,1:4);
+                            length(l) = m;
+                        end
+                    end
+                end
+            end   
+            size(temp_bin);
+            bin{l}=temp_bin;
+        end
+    setappdata(0,'bin', bin);    
+    axes(handles.SlicePlot)
+    plot(bin{floor(1)}(:,2),bin{floor(1)}(:,3),'o');
+    ylim([-1 0]);
+end
+
+set(handles.SliceSlider, 'Value', 2);
+
+axes(handles.SlicePlot)
+SliderVal = 2;
+bin = getappdata(0,'bin')
+plot(bin{floor(SliderVal)}(:,2),bin{floor(SliderVal)}(:,3),'o');
+setappdata(0,'SelectedBin', bin{floor(SliderVal)}(:,2:3))
+
+
+if get(handles.AOR,'value') == 1
+    ylim ([-1 0])
+else
+    ylim ([0 1])
+end
+
+SelectedBin = getappdata(0,'SelectedBin');
+axes(handles.FinalPlot)
+window = get(handles.RegSlider,'value');
+m=0;
+
+for n = 1: size(SelectedBin,1)
+    if SelectedBin(n,1)>0.25-window
+        if SelectedBin(n,1)<0.25+window
+            m=m+1;
+            regressionpoints(m,:) = SelectedBin(n,:);
+        end
+    end
+end   
+
+
+size(regressionpoints,2);
+step = floor(size(regressionpoints,1)/8);
+step = [1:8]*step
+
+regressionpoints_sorted = sortrows(regressionpoints,1);
+   
+for n = 1:7
+    [M,I] = max(regressionpoints_sorted(step(n):step(n+1),2));
+    regressionpoints_sorted(step(n):step(n+1),2);
+    i(n)=I+step(n)-1;
+    regressionpoints_sorted(I,:);
+end
+
+for n=1:7
+    data (n,:) = regressionpoints_sorted(i(n),:)
+end
+
+plot(SelectedBin(:,1),SelectedBin(:,2),'o');
+hold on
+plot(data (:,1),data (:,2),'or');
+if get(handles.AOR,'value') == 1
+    ylim ([-1 0]);
+else
+    ylim ([0 1]);
+end
+
+size(data(:,1),1)
+
+
+x = [ones(size(data(:,1),1),1), data(:,1)]
+
+b1 = x\data(:,2);
+reg = b1(1)+b1(2)*data(:,1);
+plot(data(:,1),reg,'LineWidth',2,'Color','Green');    
+hold off
+
+
+angle = atan(b1(2))*180/pi()
+set(handles.AngleText,'string',num2str(angle))
+
 
 
 % --- Executes on slider movement.
@@ -122,7 +269,7 @@ plot(bin{floor(SliderVal)}(:,2),bin{floor(SliderVal)}(:,3),'o');
 setappdata(0,'SelectedBin', bin{floor(SliderVal)}(:,2:3))
 
 
-if get(handles.ReposeCheckbox,'value') == 1
+if get(handles.AOR,'value') == 1
     ylim ([-1 0])
 else
     ylim ([0 1])
@@ -142,94 +289,6 @@ function SliceSlider_CreateFcn(hObject, eventdata, handles)
 % Hint: slider controls usually have a light gray background.
 if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor',[.9 .9 .9]);
-end
-
-
-
-% --- Executes on button press in UpdateDataPushbutton.
-function UpdateDataPushbutton_Callback(hObject, eventdata, handles)
-% hObject    handle to UpdateDataPushbutton (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Load and bin data
-filename = getappdata(0,'ref_filename')
-pathname = getappdata(0,'ref_pathname')
-[Imported_num, Imported_txt] = xlsread(strcat(pathname,'/',filename));
-figure(1);
-pcshow([Imported_num(:,2),Imported_num(:,3),Imported_num(:,4)],'MarkerSize',100);
-
-xlabel('X');
-ylabel('Y');
-zlabel('Z');
-% slice to 2D
-divisor = 3;
-width = max(abs(Imported_num(:,4))/divisor);
-
-
-% Drawdown Analysis
-if get(handles.DrawdownCheckbox,'value') == 1
-    set(handles.ReposeCheckbox,'value',0)
-    bin=[];
-    temp_bin=[];
-    for l = 1:divisor
-        top = width*l;
-        bottom = top - width;
-        limits(l,1)=bottom;
-        limits(l,2)=top;
-        m=0;
-        temp_bin=[];
-        for n = 1: size(Imported_num)
-            if Imported_num(n,3)>0
-                if abs(Imported_num(n,4))>bottom
-                    if abs(Imported_num(n,4))<top
-                        m=m+1;
-                        temp_bin(m,:) = Imported_num(n,1:4);
-                        length(l) = m;
-                    end
-                end
-            end
-        end   
-        size(temp_bin);
-        bin{l}=temp_bin;
-    end
-setappdata(0,'bin', bin); 
-axes(handles.SlicePlot)
-plot(bin{floor(1)}(:,2),bin{floor(1)}(:,3),'o');
-ylim([0 1])
-    
-end
-
-% Angle of Repose Analysis
-if get(handles.ReposeCheckbox,'value') == 1
-    bin=[];
-    temp_bin=[];
-    for l = 1:divisor
-        top = width*l;
-        bottom = top - width;
-        limits(l,1)=bottom;
-        limits(l,2)=top;
-        m=0;
-        temp_bin=[];
-        for n = 1: size(Imported_num)
-            if Imported_num(n,3)<0
-                if abs(Imported_num(n,4))>bottom
-                    if abs(Imported_num(n,4))<top
-                        m=m+1;
-                        temp_bin(m,:) = Imported_num(n,1:4);
-                        length(l) = m;
-                    end
-                end
-            end
-        end   
-        size(temp_bin);
-        bin{l}=temp_bin;
-    end
-setappdata(0,'bin', bin);    
-axes(handles.SlicePlot)
-plot(bin{floor(1)}(:,2),bin{floor(1)}(:,3),'o');
-ylim([-1 0]);
-    
 end
         
 
@@ -286,7 +345,7 @@ end
 plot(SelectedBin(:,1),SelectedBin(:,2),'o');
 hold on
 plot(data (:,1),data (:,2),'or');
-if get(handles.ReposeCheckbox,'value') == 1
+if get(handles.AOR,'value') == 1
     ylim ([-1 0]);
 else
     ylim ([0 1]);
@@ -314,3 +373,21 @@ function RegSlider_CreateFcn(hObject, eventdata, handles)
 if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor',[.9 .9 .9]);
 end
+
+
+% --- Executes on button press in AOR.
+function AOR_Callback(hObject, eventdata, handles)
+% hObject    handle to AOR (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of AOR
+
+
+% --- Executes on button press in Drawdown.
+function Drawdown_Callback(hObject, eventdata, handles)
+% hObject    handle to Drawdown (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of Drawdown
