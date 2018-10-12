@@ -22,7 +22,7 @@ function varargout = GUI(varargin)
 
 % Edit the above text to modify the response to help GUI
 
-% Last Modified by GUIDE v2.5 11-Oct-2018 13:44:25
+% Last Modified by GUIDE v2.5 12-Oct-2018 19:00:30
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -98,18 +98,20 @@ function SelectFilePushbutton_Callback(hObject, eventdata, handles)
 % hObject    handle to SelectFilePushbutton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-LoadData
+LoadData(hObject, eventdata, handles)
+% filename = getappdata(0,'ref_filename');
+% pathname = getappdata(0,'ref_pathname');
+% set(handles.SelectedFileText,'string',strcat(pathname,'/',filename))
 axes(handles.SlicePlot)
-if get(handles.AOR,'value') == 1
-    AngleofReposeAnalysis()
-else
-    DrawdownAnalysis()
-end
 
-SliderVal = get(handles.SliceSlider,'value')
-bin = getappdata(0,'bin')
-plot(bin{floor(SliderVal)}(:,2),bin{floor(SliderVal)}(:,3),'ob');
-setappdata(0,'SelectedBin', bin{floor(SliderVal)}(:,2:3));
+SortSlices(hObject, eventdata, handles)
+
+
+SelectedBin = getappdata(0,'SelectedBin');
+
+plot(SelectedBin(:,1),SelectedBin(:,1),'ob');
+
+
 if get(handles.AOR,'value') == 1
     ylim ([-1 0]);
 else
@@ -117,7 +119,7 @@ else
 end
 
 axes(handles.FinalPlot)
-Regression(get(handles.RegSlider,'value'))
+Regression(hObject, eventdata, handles)
 xreg = getappdata(0,'xreg');
 yreg = getappdata(0,'yreg');
 RegData = getappdata(0,'RegData');
@@ -137,7 +139,7 @@ end
 hold off
 
 angle = getappdata(0,'angle');
-set(handles.AngleText,'string',num2str(angle))
+set(handles.AngleRight,'string',num2str(angle))
 
 % --- Executes on slider movement.
 function SliceSlider_Callback(hObject, eventdata, handles)
@@ -153,11 +155,12 @@ axes(handles.SlicePlot)
 SliderVal = get(handles.SliceSlider,'value')
 bin = getappdata(0,'bin')
 plot(bin{floor(SliderVal)}(:,2),bin{floor(SliderVal)}(:,3),'ob');
+
+SortSlices()
+
 if get(handles.AOR,'value') == 1
-    AngleofReposeAnalysis()
     ylim ([-1 0]);   
 else
-    DrawdownAnalysis()
     ylim ([0 1]); 
 end
 setappdata(0,'SelectedBin', bin{floor(SliderVal)}(:,2:3));
@@ -194,26 +197,9 @@ function RegSlider_Callback(hObject, eventdata, handles)
 
 % Hints: get(hObject,'Value') returns position of slider
 %        get(hObject,'Min') and get(hObject,'Max') to determine range of slider
-get(handles.RegSlider,'value')
-Regression(get(handles.RegSlider,'value'))
-angle = getappdata(0,'angle');
-set(handles.AngleText,'string',num2str(angle))
-axes(handles.FinalPlot)
-xreg = getappdata(0,'xreg');
-yreg = getappdata(0,'yreg');
-RegData = getappdata(0,'RegData');
-SelectedBin = getappdata(0,'SelectedBin');
-axes(handles.FinalPlot)
-plot(SelectedBin(:,1),SelectedBin(:,2),'ob');
-hold on
-plot(RegData (:,1),RegData (:,2),'or')
-plot(xreg,yreg,'LineWidth',2,'Color','Green');
-if get(handles.AOR,'value') == 1
-    ylim ([-1 0]);
-else
-    ylim ([0 1]);
-end
-hold off
+
+Regression(hObject, eventdata, handles)
+
 
 
 % --- Executes during object creation, after setting all properties.
@@ -246,11 +232,9 @@ function Drawdown_Callback(hObject, eventdata, handles)
 
 % Hint: get(hObject,'Value') returns toggle state of Drawdown
 
-function LoadData ()
+function LoadData (hObject, eventdata, handles)
 % Load and bin data
 [file,path] = uigetfile('*.csv');
-setappdata(0,'ref_filename', file)
-setappdata(0,'ref_pathname', path)
 filename = file;
 pathname = path;
 [Imported_num, Imported_txt] = xlsread(strcat(pathname,'/',filename));
@@ -267,41 +251,14 @@ width = max(abs(Imported_num(:,4))/divisor);
 setappdata(0,'Imported_num', Imported_num)
 setappdata(0,'width', width)
 setappdata(0,'divisor', divisor)
+setappdata(0,'ref_filename', file)
+setappdata(0,'ref_pathname', path)
 
-function DrawdownAnalysis ()
+set(handles.SelectedFileText,'string',strcat(pathname,'/',filename))
 
-divisor = getappdata(0,'divisor');
-width = getappdata(0,'width');
-Imported_num = getappdata(0,'Imported_num');
-bin=[];
-temp_bin=[];
-    for l = 1:divisor
-        top = width*l;
-        bottom = top - width;
-        limits(l,1)=bottom;
-        limits(l,2)=top;
-        m=0;
-        temp_bin=[];
-        for n = 1: size(Imported_num)
-            if Imported_num(n,3)>0
-                if abs(Imported_num(n,4))>bottom
-                    if abs(Imported_num(n,4))<top
-                        m=m+1;
-                        temp_bin(m,:) = Imported_num(n,1:4);
-                        length(l) = m;
-                    end
-                end
-            end
-        end   
-        size(temp_bin);
-        bin{l}=temp_bin;
-    end
-setappdata(0,'bin', bin); 
-% %axes(handles.SlicePlot)
-% plot(bin{floor(1)}(:,2),bin{floor(1)}(:,3),'o');
-% ylim([0 1])    
+  
 
-function AngleofReposeAnalysis()
+function SortSlices(hObject, eventdata, handles)
     
 divisor = getappdata(0,'divisor');
 width = getappdata(0,'width');
@@ -327,56 +284,84 @@ for l = 1:divisor
         end
     end   
     size(temp_bin);
-    bin{l}=temp_bin
+    bin{l}=temp_bin;
 end
-setappdata(0,'bin', bin);   
-% %axes(handles.SlicePlot)
-% plot(bin{floor(1)}(:,2),bin{floor(1)}(:,3),'o');
-% ylim([-1 0]);
+setappdata(0,'bin', bin);
+SliderVal = get(handles.SliceSlider,'value');
+setappdata(0,'SelectedBin', bin{floor(SliderVal)}(:,2:3));
 
-function Regression(window)
+
+function Regression(hObject, eventdata, handles)
+
+
 SelectedBin = getappdata(0,'SelectedBin');
-window = window
+SelectedBin_sorted = sortrows(SelectedBin,1)
+window = get(handles.RegSlider,'value');
+max(SelectedBin_sorted(:,1));
 
-m=0;
 
-for n = 1: size(SelectedBin,1)
-    if SelectedBin(n,1)>0.25-window
-        if SelectedBin(n,1)<0.25+window
-            m=m+1;
-            regressionpoints(m,:) = SelectedBin(n,:);
+for l = 1:20
+    top = ((max(SelectedBin_sorted(:,1))/20))*l;
+    bottom = top - ((max(SelectedBin_sorted(:,1))/20));
+    m=0;
+    temp_bin=[];
+    for n = 1:size(SelectedBin_sorted,1)
+        if SelectedBin_sorted(n,1)>bottom
+            if SelectedBin_sorted(n,1)<top
+                m = m + 1;
+                temp_bin(m,:) = SelectedBin_sorted(n,:);
+            end
         end
     end
-end   
-
-
-size(regressionpoints,2);
-step = floor(size(regressionpoints,1)/8);
-step = [1:8]*step
-
-regressionpoints_sorted = sortrows(regressionpoints,1);
-
-for n = 1:7
-    [M,I] = max(regressionpoints_sorted(step(n):step(n+1),2));
-    regressionpoints_sorted(step(n):step(n+1),2);
-    i(n)=I+step(n)-1;
-    regressionpoints_sorted(I,:);
+    temp_bin = sortrows(temp_bin,2);
+    regressionpoints(l,:) = temp_bin(end,:);
 end
 
-for n=1:7
-    data (n,:) = regressionpoints_sorted(i(n),:);
+regressionpoints = regressionpoints(((size(regressionpoints,1)/2)-window/2):((size(regressionpoints,1)/2)+window/2),:);
+
+% PosVal = get(handles.PosSlider,'value')
+% 
+% regressionpoints(1:PosVal,:) = [];
+% regressionpoints
+
+x = [ones(length(regressionpoints(:,1)),1), regressionpoints(:,1)];
+
+b1 = x\regressionpoints(:,2);
+reg = b1(1)+b1(2)*regressionpoints(:,1);
+angle = atan(b1(2))*180/pi();
+
+set(handles.AngleRight,'string',num2str(angle))
+axes(handles.FinalPlot)
+
+plot(SelectedBin(:,1),SelectedBin(:,2),'ob');
+hold on
+plot(regressionpoints(:,1),regressionpoints(:,2),'or')
+plot(regressionpoints(:,1),reg,'LineWidth',2,'Color','Green');
+if get(handles.AOR,'value') == 1
+    ylim ([-1 0]);
+else
+    ylim ([0 1]);
 end
-setappdata(0,'SelectedBin', SelectedBin);
-setappdata(0,'RegData', data);
+hold off
 
 
-x = [ones(length(data(:,1)),1), data(:,1)]
+% --- Executes on slider movement.
+function PosSlider_Callback(hObject, eventdata, handles)
+% hObject    handle to PosSlider (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
 
-b1 = x\data(:,2);
-reg = b1(1)+b1(2)*data(:,1);
-setappdata(0,'xreg', data(:,1));
-setappdata(0,'yreg', reg);
-setappdata(0,'regdata', b1(2)*data(:,1));
+% Hints: get(hObject,'Value') returns position of slider
+%        get(hObject,'Min') and get(hObject,'Max') to determine range of slider
 
-angle = atan(b1(2))*180/pi()
-setappdata(0,'angle', angle)
+
+% --- Executes during object creation, after setting all properties.
+function PosSlider_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to PosSlider (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: slider controls usually have a light gray background.
+if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor',[.9 .9 .9]);
+end
