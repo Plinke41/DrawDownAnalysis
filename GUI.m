@@ -22,7 +22,7 @@ function varargout = GUI(varargin)
 
 % Edit the above text to modify the response to help GUI
 
-% Last Modified by GUIDE v2.5 11-Oct-2018 09:24:36
+% Last Modified by GUIDE v2.5 11-Oct-2018 13:44:25
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -62,6 +62,7 @@ guidata(hObject, handles);
 % UIWAIT makes GUI wait for user response (see UIRESUME)
 % uiwait(handles.figure1);
 
+setappdata(0,'divisor',20);
 
 % --- Outputs from this function are returned to the command line.
 function varargout = GUI_OutputFcn(hObject, eventdata, handles)
@@ -97,161 +98,46 @@ function SelectFilePushbutton_Callback(hObject, eventdata, handles)
 % hObject    handle to SelectFilePushbutton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-[filename, pathname] = uigetfile({'*.csv'},'File Selector');
-
-setappdata(0,'ref_filename', filename)
-setappdata(0,'ref_pathname', pathname)
-
-set(handles.SelectedFileText, 'string', strcat(pathname,'/',filename))
-
-% Load and bin data
-filename = getappdata(0,'ref_filename')
-pathname = getappdata(0,'ref_pathname')
-[Imported_num, Imported_txt] = xlsread(strcat(pathname,'/',filename));
-figure(1);
-pcshow([Imported_num(:,2),Imported_num(:,3),Imported_num(:,4)],'MarkerSize',100);
-
-xlabel('X');
-ylabel('Y');
-zlabel('Z');
-% slice to 2D
-divisor = 3;
-width = max(abs(Imported_num(:,4))/divisor);
-
-
-% Drawdown Analysis
-if get(handles.Drawdown,'value') == 1
-    bin=[];
-    temp_bin=[];
-        for l = 1:divisor
-            top = width*l;
-            bottom = top - width;
-            limits(l,1)=bottom;
-            limits(l,2)=top;
-            m=0;
-            temp_bin=[];
-            for n = 1: size(Imported_num)
-                if Imported_num(n,3)>0
-                    if abs(Imported_num(n,4))>bottom
-                        if abs(Imported_num(n,4))<top
-                            m=m+1;
-                            temp_bin(m,:) = Imported_num(n,1:4);
-                            length(l) = m;
-                        end
-                    end
-                end
-            end   
-            size(temp_bin);
-            bin{l}=temp_bin;
-        end
-    setappdata(0,'bin', bin); 
-    axes(handles.SlicePlot)
-    plot(bin{floor(1)}(:,2),bin{floor(1)}(:,3),'o');
-    ylim([0 1])    
-end
-
-% Angle of Repose Analysis
-if get(handles.AOR,'value') == 1
-        bin=[];
-        temp_bin=[];
-        for l = 1:divisor
-            top = width*l;
-            bottom = top - width;
-            limits(l,1)=bottom;
-            limits(l,2)=top;
-            m=0;
-            temp_bin=[];
-            for n = 1: size(Imported_num)
-                if Imported_num(n,3)<0
-                    if abs(Imported_num(n,4))>bottom
-                        if abs(Imported_num(n,4))<top
-                            m=m+1;
-                            temp_bin(m,:) = Imported_num(n,1:4);
-                            length(l) = m;
-                        end
-                    end
-                end
-            end   
-            size(temp_bin);
-            bin{l}=temp_bin;
-        end
-    setappdata(0,'bin', bin);    
-    axes(handles.SlicePlot)
-    plot(bin{floor(1)}(:,2),bin{floor(1)}(:,3),'o');
-    ylim([-1 0]);
-end
-
-set(handles.SliceSlider, 'Value', 2);
-
+LoadData
 axes(handles.SlicePlot)
-SliderVal = 2;
-bin = getappdata(0,'bin')
-plot(bin{floor(SliderVal)}(:,2),bin{floor(SliderVal)}(:,3),'o');
-setappdata(0,'SelectedBin', bin{floor(SliderVal)}(:,2:3))
-
-
 if get(handles.AOR,'value') == 1
-    ylim ([-1 0])
+    AngleofReposeAnalysis()
 else
-    ylim ([0 1])
+    DrawdownAnalysis()
 end
 
-SelectedBin = getappdata(0,'SelectedBin');
-axes(handles.FinalPlot)
-window = get(handles.RegSlider,'value');
-m=0;
-
-for n = 1: size(SelectedBin,1)
-    if SelectedBin(n,1)>0.25-window
-        if SelectedBin(n,1)<0.25+window
-            m=m+1;
-            regressionpoints(m,:) = SelectedBin(n,:);
-        end
-    end
-end   
-
-
-size(regressionpoints,2);
-step = floor(size(regressionpoints,1)/8);
-step = [1:8]*step
-
-regressionpoints_sorted = sortrows(regressionpoints,1);
-   
-for n = 1:7
-    [M,I] = max(regressionpoints_sorted(step(n):step(n+1),2));
-    regressionpoints_sorted(step(n):step(n+1),2);
-    i(n)=I+step(n)-1;
-    regressionpoints_sorted(I,:);
-end
-
-for n=1:7
-    data (n,:) = regressionpoints_sorted(i(n),:)
-end
-
-plot(SelectedBin(:,1),SelectedBin(:,2),'o');
-hold on
-plot(data (:,1),data (:,2),'or');
+SliderVal = get(handles.SliceSlider,'value')
+bin = getappdata(0,'bin')
+plot(bin{floor(SliderVal)}(:,2),bin{floor(SliderVal)}(:,3),'ob');
+setappdata(0,'SelectedBin', bin{floor(SliderVal)}(:,2:3));
 if get(handles.AOR,'value') == 1
     ylim ([-1 0]);
 else
-    ylim ([0 1]);
+   ylim ([0 1]);
 end
 
-size(data(:,1),1)
+axes(handles.FinalPlot)
+Regression(get(handles.RegSlider,'value'))
+xreg = getappdata(0,'xreg');
+yreg = getappdata(0,'yreg');
+RegData = getappdata(0,'RegData');
 
+plot(xreg,yreg,'LineWidth',2,'Color','Green');
+hold on
+SelectedBin = getappdata(0,'SelectedBin');
 
-x = [ones(size(data(:,1),1),1), data(:,1)]
-
-b1 = x\data(:,2);
-reg = b1(1)+b1(2)*data(:,1);
-plot(data(:,1),reg,'LineWidth',2,'Color','Green');    
+plot(SelectedBin(:,1),SelectedBin(:,2),'ob');
+plot(RegData (:,1),RegData (:,2),'or');
+plot(xreg,yreg,'LineWidth',2,'Color','Green');
+if get(handles.AOR,'value') == 1
+    ylim ([-1 0]);
+else
+   ylim ([0 1]);
+end
 hold off
 
-
-angle = atan(b1(2))*180/pi()
+angle = getappdata(0,'angle');
 set(handles.AngleText,'string',num2str(angle))
-
-
 
 % --- Executes on slider movement.
 function SliceSlider_Callback(hObject, eventdata, handles)
@@ -263,20 +149,18 @@ function SliceSlider_Callback(hObject, eventdata, handles)
 %        get(hObject,'Min') and get(hObject,'Max') to determine range of slider
 
 axes(handles.SlicePlot)
+
 SliderVal = get(handles.SliceSlider,'value')
 bin = getappdata(0,'bin')
-plot(bin{floor(SliderVal)}(:,2),bin{floor(SliderVal)}(:,3),'o');
-setappdata(0,'SelectedBin', bin{floor(SliderVal)}(:,2:3))
-
-
+plot(bin{floor(SliderVal)}(:,2),bin{floor(SliderVal)}(:,3),'ob');
 if get(handles.AOR,'value') == 1
-    ylim ([-1 0])
+    AngleofReposeAnalysis()
+    ylim ([-1 0]);   
 else
-    ylim ([0 1])
+    DrawdownAnalysis()
+    ylim ([0 1]); 
 end
-    
-
-
+setappdata(0,'SelectedBin', bin{floor(SliderVal)}(:,2:3));
 
 
 
@@ -290,6 +174,7 @@ function SliceSlider_CreateFcn(hObject, eventdata, handles)
 if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor',[.9 .9 .9]);
 end
+
         
 
 % --- Executes on button press in DrawdownCheckbox.
@@ -309,58 +194,26 @@ function RegSlider_Callback(hObject, eventdata, handles)
 
 % Hints: get(hObject,'Value') returns position of slider
 %        get(hObject,'Min') and get(hObject,'Max') to determine range of slider
-
+get(handles.RegSlider,'value')
+Regression(get(handles.RegSlider,'value'))
+angle = getappdata(0,'angle');
+set(handles.AngleText,'string',num2str(angle))
+axes(handles.FinalPlot)
+xreg = getappdata(0,'xreg');
+yreg = getappdata(0,'yreg');
+RegData = getappdata(0,'RegData');
 SelectedBin = getappdata(0,'SelectedBin');
 axes(handles.FinalPlot)
-window = get(handles.RegSlider,'value');
-m=0;
-
-for n = 1: size(SelectedBin,1)
-    if SelectedBin(n,1)>0.25-window
-        if SelectedBin(n,1)<0.25+window
-            m=m+1;
-            regressionpoints(m,:) = SelectedBin(n,:);
-        end
-    end
-end   
-
-
-size(regressionpoints,2);
-step = floor(size(regressionpoints,1)/8);
-step = [1:8]*step
-
-regressionpoints_sorted = sortrows(regressionpoints,1);
-   
-for n = 1:7
-    [M,I] = max(regressionpoints_sorted(step(n):step(n+1),2));
-    regressionpoints_sorted(step(n):step(n+1),2);
-    i(n)=I+step(n)-1;
-    regressionpoints_sorted(I,:);
-end
-
-for n=1:7
-    data (n,:) = regressionpoints_sorted(i(n),:);
-end
-
-plot(SelectedBin(:,1),SelectedBin(:,2),'o');
+plot(SelectedBin(:,1),SelectedBin(:,2),'ob');
 hold on
-plot(data (:,1),data (:,2),'or');
+plot(RegData (:,1),RegData (:,2),'or')
+plot(xreg,yreg,'LineWidth',2,'Color','Green');
 if get(handles.AOR,'value') == 1
     ylim ([-1 0]);
 else
     ylim ([0 1]);
 end
-
-x = [ones(length(data(:,1)),1), data(:,1)]
-
-b1 = x\data(:,2);
-reg = b1(1)+b1(2)*data(:,1);
-plot(data(:,1),reg,'LineWidth',2,'Color','Green');    
 hold off
-
-
-angle = atan(b1(2))*180/pi()
-set(handles.AngleText,'string',num2str(angle))
 
 
 % --- Executes during object creation, after setting all properties.
@@ -373,6 +226,7 @@ function RegSlider_CreateFcn(hObject, eventdata, handles)
 if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor',[.9 .9 .9]);
 end
+
 
 
 % --- Executes on button press in AOR.
@@ -391,3 +245,138 @@ function Drawdown_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of Drawdown
+
+function LoadData ()
+% Load and bin data
+[file,path] = uigetfile('*.csv');
+setappdata(0,'ref_filename', file)
+setappdata(0,'ref_pathname', path)
+filename = file;
+pathname = path;
+[Imported_num, Imported_txt] = xlsread(strcat(pathname,'/',filename));
+figure(1);
+pcshow([Imported_num(:,2),Imported_num(:,3),Imported_num(:,4)],'MarkerSize',100);
+
+xlabel('X');
+ylabel('Y');
+zlabel('Z');
+% slice to 2D
+divisor = 3;
+width = max(abs(Imported_num(:,4))/divisor);
+
+setappdata(0,'Imported_num', Imported_num)
+setappdata(0,'width', width)
+setappdata(0,'divisor', divisor)
+
+function DrawdownAnalysis ()
+
+divisor = getappdata(0,'divisor');
+width = getappdata(0,'width');
+Imported_num = getappdata(0,'Imported_num');
+bin=[];
+temp_bin=[];
+    for l = 1:divisor
+        top = width*l;
+        bottom = top - width;
+        limits(l,1)=bottom;
+        limits(l,2)=top;
+        m=0;
+        temp_bin=[];
+        for n = 1: size(Imported_num)
+            if Imported_num(n,3)>0
+                if abs(Imported_num(n,4))>bottom
+                    if abs(Imported_num(n,4))<top
+                        m=m+1;
+                        temp_bin(m,:) = Imported_num(n,1:4);
+                        length(l) = m;
+                    end
+                end
+            end
+        end   
+        size(temp_bin);
+        bin{l}=temp_bin;
+    end
+setappdata(0,'bin', bin); 
+% %axes(handles.SlicePlot)
+% plot(bin{floor(1)}(:,2),bin{floor(1)}(:,3),'o');
+% ylim([0 1])    
+
+function AngleofReposeAnalysis()
+    
+divisor = getappdata(0,'divisor');
+width = getappdata(0,'width');
+Imported_num = getappdata(0,'Imported_num');
+bin=[];
+temp_bin=[];
+for l = 1:divisor
+    top = width*l;
+    bottom = top - width;
+    limits(l,1)=bottom;
+    limits(l,2)=top;
+    m=0;
+    temp_bin=[];
+    for n = 1: size(Imported_num)
+        if Imported_num(n,3)<0
+            if abs(Imported_num(n,4))>bottom
+                if abs(Imported_num(n,4))<top
+                    m=m+1;
+                    temp_bin(m,:) = Imported_num(n,1:4);
+                    length(l) = m;
+                end
+            end
+        end
+    end   
+    size(temp_bin);
+    bin{l}=temp_bin
+end
+setappdata(0,'bin', bin);   
+% %axes(handles.SlicePlot)
+% plot(bin{floor(1)}(:,2),bin{floor(1)}(:,3),'o');
+% ylim([-1 0]);
+
+function Regression(window)
+SelectedBin = getappdata(0,'SelectedBin');
+window = window
+
+m=0;
+
+for n = 1: size(SelectedBin,1)
+    if SelectedBin(n,1)>0.25-window
+        if SelectedBin(n,1)<0.25+window
+            m=m+1;
+            regressionpoints(m,:) = SelectedBin(n,:);
+        end
+    end
+end   
+
+
+size(regressionpoints,2);
+step = floor(size(regressionpoints,1)/8);
+step = [1:8]*step
+
+regressionpoints_sorted = sortrows(regressionpoints,1);
+
+for n = 1:7
+    [M,I] = max(regressionpoints_sorted(step(n):step(n+1),2));
+    regressionpoints_sorted(step(n):step(n+1),2);
+    i(n)=I+step(n)-1;
+    regressionpoints_sorted(I,:);
+end
+
+for n=1:7
+    data (n,:) = regressionpoints_sorted(i(n),:);
+end
+setappdata(0,'SelectedBin', SelectedBin);
+setappdata(0,'RegData', data);
+
+
+x = [ones(length(data(:,1)),1), data(:,1)]
+
+b1 = x\data(:,2);
+reg = b1(1)+b1(2)*data(:,1);
+setappdata(0,'xreg', data(:,1));
+setappdata(0,'yreg', reg);
+setappdata(0,'regdata', b1(2)*data(:,1));
+
+angle = atan(b1(2))*180/pi()
+setappdata(0,'angle', angle)
