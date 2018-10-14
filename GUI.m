@@ -134,12 +134,7 @@ if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColo
     set(hObject,'BackgroundColor',[.9 .9 .9]);
 end
 
-if get (handles.AOR,'Value') == 1
-    RegressAOR(hObject, eventdata, handles)
-else
-    RegressDD(hObject, eventdata, handles)
-end
-        
+       
 
 % --- Executes on button press in DrawdownCheckbox.
 function DrawdownCheckbox_Callback(hObject, eventdata, handles)
@@ -273,7 +268,7 @@ else
 end
 
 function RegressDD(hObject, eventdata, handles)
-
+% deal with positive x domain
 SelectedBin = getappdata(0,'SelectedBin');
 SelectedBin_sorted = sortrows(SelectedBin,1);
 window = get(handles.RegSlider,'value');
@@ -330,7 +325,76 @@ axes(handles.FinalPlot)
 
 plot(SelectedBin(:,1),SelectedBin(:,2),'ob');
 hold on
-plot(regressionpoints(:,1),regressionpoints(:,2),'or')
+plot(regressionpoints(:,1),regressionpoints(:,2),'or','MarkerSize',10)
+plot(regressionpoints(:,1),reg,'LineWidth',2,'Color','Green');
+if get(handles.AOR,'value') == 1
+    ylim ([-1 0]);
+else
+    ylim ([0 1]);
+end
+
+%__________________________________________________________________________
+% deal with negative x domain
+SelectedBin = getappdata(0,'SelectedBin');
+SelectedBin(:,1) = SelectedBin(:,1) * (-1);
+SelectedBin_sorted = sortrows(SelectedBin,1);
+window = get(handles.RegSlider,'value');
+max(SelectedBin_sorted(:,1));
+PosVal = floor(get(handles.PosSlider,'value'));
+
+clear temp_bin;
+clear regressionpoints;
+
+m = 1;
+for n = 1: size(SelectedBin_sorted,1)
+    if SelectedBin_sorted(n,1)>0
+        windowmin(m) = SelectedBin_sorted(n,1);
+        m=m+1
+    end
+end
+windowmin = min(windowmin);
+
+for l = 1:20
+    step = (max(SelectedBin_sorted(:,1)-windowmin)/20);
+    top = windowmin + step * l;
+    bottom = top - step;
+    m=0;
+    temp_bin=[];
+    for n = 1:size(SelectedBin_sorted,1)
+        if SelectedBin_sorted(n,1)>bottom
+            if SelectedBin_sorted(n,1)<top
+                m = m + 1;
+                temp_bin(m,:) = SelectedBin_sorted(n,:);
+            end
+        end
+    end
+    temp_bin = sortrows(temp_bin,2);
+    regressionpoints(l,:) = temp_bin(end,:);
+end
+
+% Apply window width
+regressionpoints = regressionpoints(((size(regressionpoints,1)/2)-window):((size(regressionpoints,1)/2)+window),:);
+
+% Apply Position Value
+n=1;
+for i = (abs(PosVal)+1):(size(regressionpoints,1)-abs(PosVal)-1)
+    regressionpoints_pos(n,:) = regressionpoints((i + PosVal),:);
+    n=n+1;
+    i;
+end
+regressionpoints = regressionpoints_pos;
+
+x = [ones(length(regressionpoints(:,1)),1), regressionpoints(:,1)];
+
+b1 = x\regressionpoints(:,2);
+reg = b1(1)+b1(2)*regressionpoints(:,1);
+regressionpoints(:,1) = regressionpoints(:,1) *(-1);
+angle = atan(b1(2))*180/pi();
+
+set(handles.AngleLeft,'string',num2str(angle))
+axes(handles.FinalPlot)
+
+plot(regressionpoints(:,1),regressionpoints(:,2),'or','MarkerSize',10)
 plot(regressionpoints(:,1),reg,'LineWidth',2,'Color','Green');
 if get(handles.AOR,'value') == 1
     ylim ([-1 0]);
@@ -340,23 +404,25 @@ end
 hold off
 
 function RegressAOR(hObject, eventdata, handles)
-
+%__________________________________________________________________________
+% deal with positive x domain
 SelectedBin = getappdata(0,'SelectedBin');
 SelectedBin_sorted = sortrows(SelectedBin,1);
 window = get(handles.RegSlider,'value');
 max(SelectedBin_sorted(:,1));
 PosVal = floor(get(handles.PosSlider,'value'));
 
+% Deal with positive z
 for l = 1:20
-    top = ((max(SelectedBin_sorted(:,1))/20))*l
-    bottom = top - ((max(SelectedBin_sorted(:,1))/20))
+    top = ((max(SelectedBin_sorted(:,1))/20))*l;
+    bottom = top - ((max(SelectedBin_sorted(:,1))/20));
     m=0;
     temp_bin=[];
     for n = 1:size(SelectedBin_sorted,1)
         if SelectedBin_sorted(n,1)>bottom
             if SelectedBin_sorted(n,1)<top
                 m = m + 1;
-                temp_bin(m,:) = SelectedBin_sorted(n,:)
+                temp_bin(m,:) = SelectedBin_sorted(n,:);
             end
         end
     end
@@ -387,13 +453,70 @@ axes(handles.FinalPlot)
 
 plot(SelectedBin(:,1),SelectedBin(:,2),'ob');
 hold on
-plot(regressionpoints(:,1),regressionpoints(:,2),'or')
+plot(regressionpoints(:,1),regressionpoints(:,2),'or','MarkerSize',10)
+plot(regressionpoints(:,1),reg,'LineWidth',2,'Color','Green');
+
+
+%__________________________________________________________________________
+% deal with negative x domain
+SelectedBin = getappdata(0,'SelectedBin');
+SelectedBin(:,1) = SelectedBin(:,1) * (-1)
+SelectedBin_sorted = sortrows(SelectedBin,1);
+window = get(handles.RegSlider,'value');
+max(SelectedBin_sorted(:,1));
+PosVal = floor(get(handles.PosSlider,'value'));
+
+clear temp_bin;
+clear regressionpoints;
+
+for l = 1:20
+    top = ((max(SelectedBin_sorted(:,1))/20))*l;
+    bottom = top - ((max(SelectedBin_sorted(:,1))/20));
+    m=0;
+    temp_bin=[];
+    for n = 1:size(SelectedBin_sorted,1)
+        if SelectedBin_sorted(n,1)>bottom
+            if SelectedBin_sorted(n,1)<top
+                m = m + 1;
+                temp_bin(m,:) = SelectedBin_sorted(n,:);
+            end
+        end
+    end
+    temp_bin = sortrows(temp_bin,2);
+    regressionpoints(l,:) = temp_bin(end,:);
+end
+
+% Apply window width
+regressionpoints = regressionpoints(((size(regressionpoints,1)/2)-window):((size(regressionpoints,1)/2)+window),:);
+
+% Apply Position Value
+n=1;
+for i = (abs(PosVal)+1):(size(regressionpoints,1)-abs(PosVal)-1)
+    regressionpoints_pos(n,:) = regressionpoints((i + PosVal),:);
+    n=n+1;
+    i;
+end
+regressionpoints = regressionpoints_pos;
+
+x = [ones(length(regressionpoints(:,1)),1), regressionpoints(:,1)];
+
+b1 = x\regressionpoints(:,2);
+reg = b1(1)+b1(2)*regressionpoints(:,1);
+angle = atan(b1(2))*180/pi();
+
+reg = reg;
+regressionpoints(:,1) = regressionpoints(:,1) *(-1);
+
+set(handles.AngleLeft,'string',num2str(angle))
+
+plot(regressionpoints(:,1),regressionpoints(:,2),'or','MarkerSize',10)
 plot(regressionpoints(:,1),reg,'LineWidth',2,'Color','Green');
 if get(handles.AOR,'value') == 1
     ylim ([-1 0]);
 else
     ylim ([0 1]);
 end
+
 hold off
 
 
